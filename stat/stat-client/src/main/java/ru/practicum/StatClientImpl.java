@@ -48,6 +48,7 @@ public class StatClientImpl implements StatClient {
                         .build())
                 .accept(APPLICATION_JSON)
                 .retrieve()
-                .body(new ParameterizedTypeReference<List<StatResponseDto>>() {});
+                .body(new ParameterizedTypeReference<List<StatResponseDto>>() {
+                });
     }
 }

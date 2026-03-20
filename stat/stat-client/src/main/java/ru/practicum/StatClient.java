@@ -8,10 +8,10 @@ import java.util.List;
 
 public interface StatClient {
 
-//    Добавит запись в статистику
+    //    Добавит запись в статистику
     HitDto postHit(HitDto dto);
 
-//    Получить статистику
+    //    Получить статистику
     List<StatResponseDto> getStats(StatRequestParamDto dto);
 
 }
