@@ -11,6 +11,8 @@ import ru.practicum.ewm.HitDto;
 import ru.practicum.ewm.StatRequestParamDto;
 import ru.practicum.ewm.StatResponseDto;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -20,6 +22,7 @@ import static org.springframework.http.MediaType.APPLICATION_JSON;
 @Component
 public class StatClientImpl implements StatClient {
     private final RestClient restClient;
+    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     public StatClientImpl(RestClient.Builder builder) {
         this.restClient = builder
@@ -72,6 +75,16 @@ public class StatClientImpl implements StatClient {
                     "Параметры запроса: {}", dto);
             return new ArrayList<>();
         }
+    }
+    public void saveHit(String uri, String app) {
+        HitDto hitDto = new HitDto();
+        hitDto.setApp(app);
+        hitDto.setUri(uri);
+        hitDto.setIp("127.0.0.1");
+        hitDto.setTimestamp(LocalDateTime.now().format(FORMATTER));
+
+        log.debug("Сохранение статистики: uri={}, app={}", uri, app);
+        postHit(hitDto);  // переиспользуем существующий метод
     }
 
 }

@@ -13,6 +13,8 @@ import java.lang.annotation.Target;
 @Constraint(validatedBy = NotBlankOrNullValidator.class)
 public @interface NotBlankOrNull {
     String message() default "Строка не должна быть пустой или состоять из пробелов";
+
     Class<?>[] groups() default {};
+
     Class<? extends Payload>[] payload() default {};
 }

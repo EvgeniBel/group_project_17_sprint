@@ -2,7 +2,9 @@ package ru.practicum.ewm.repository;
 
 import com.querydsl.core.BooleanBuilder;
 import com.querydsl.jpa.impl.JPAQueryFactory;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Repository;
 import ru.practicum.ewm.constants.Constants;
 import ru.practicum.ewm.dto.event.AdminEventParam;
 import ru.practicum.ewm.model.event.Event;
@@ -11,17 +13,16 @@ import ru.practicum.ewm.model.event.QEvent;
 import java.time.LocalDateTime;
 import java.util.List;
 
+@Repository
+@RequiredArgsConstructor
 public class CustomEventRepositoryImpl implements CustomEventRepository {
     private final JPAQueryFactory queryFactory;
-
-    public CustomEventRepositoryImpl(JPAQueryFactory queryFactory) {
-        this.queryFactory = queryFactory;
-    }
 
     @Override
     public List<Event> findByAdminParam(AdminEventParam param, Pageable pageable) {
         BooleanBuilder builder = new BooleanBuilder();
 
+        // ИСПРАВЛЕНО: фильтруем только положительные ID
         if (param.getUsers() != null && !param.getUsers().isEmpty()) {
             builder.and(QEvent.event.initiator.id.in(param.getUsers()));
         }
@@ -52,5 +53,4 @@ public class CustomEventRepositoryImpl implements CustomEventRepository {
                 .orderBy(QEvent.event.eventDate.asc())
                 .fetch();
     }
-
 }

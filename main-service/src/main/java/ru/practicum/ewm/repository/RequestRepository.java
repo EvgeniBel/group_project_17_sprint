@@ -1,8 +1,11 @@
 package ru.practicum.ewm.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.ewm.model.request.ParticipationRequest;
 import ru.practicum.ewm.model.request.RequestStatus;
 
@@ -20,12 +23,10 @@ public interface RequestRepository extends JpaRepository<ParticipationRequest, L
             """)
     List<ParticipationRequest> findAllByUserId(long userId);
 
-    @Query("""
-            UPDATE ParticipationRequest r
-            SET r.status = :state
-            WHERE r.id = :requestId
-            """)
-    int changeState(long requestId, RequestStatus state);
+    @Modifying
+    @Transactional
+    @Query("UPDATE ParticipationRequest r SET r.status = :state WHERE r.id = :requestId")
+    int changeState(@Param("requestId") long requestId, @Param("state") RequestStatus state);
 
     Long countByEvent_IdAndStatus(Long eventId, RequestStatus status);
 

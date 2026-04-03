@@ -26,4 +26,7 @@ public interface EventService {
 
     EventFullDto patchEventByIdByAdmin(Long eventId, UpdateEventAdminRequest dto);
 
+    List<EventShortDto> getPublicEvents(PublicEventParam param);
+
+    EventFullDto getPublicEventById(Long id);
 }

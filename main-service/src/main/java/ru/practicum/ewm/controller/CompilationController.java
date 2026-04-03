@@ -23,8 +23,8 @@ public class CompilationController {
     @ResponseStatus(HttpStatus.OK)
     public List<CompilationDto> getCompilations(
             @RequestParam(defaultValue = "true") Boolean pinned,
-            @PositiveOrZero @RequestParam(defaultValue = "0") Long from,
-            @PositiveOrZero @RequestParam(defaultValue = "10") Long size
+            @PositiveOrZero @RequestParam(defaultValue = "0") Integer from,
+            @PositiveOrZero @RequestParam(defaultValue = "10") Integer size
     ) {
         return service.getCompilations(GetManyCompilationDto.builder()
                 .pinned(pinned)

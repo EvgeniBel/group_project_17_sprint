@@ -8,12 +8,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import ru.practicum.ewm.dto.compilation.CompilationDto;
 import ru.practicum.ewm.dto.compilation.CreateCompilationDto;
-import ru.practicum.ewm.mapper.CompilationMapper;
+import ru.practicum.ewm.dto.compilation.UpdateCompilationDto;
 import ru.practicum.ewm.service.CompilationService;
-
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 
 @Slf4j
 @RestController
@@ -27,19 +23,27 @@ public class CompilationAdminController {
     @ResponseStatus(HttpStatus.CREATED)
     public CompilationDto createCompilation(
             @Valid @RequestBody CreateCompilationDto dto) {
-        if(dto.getPinned() == null)
+        if (dto.getPinned() == null)
             dto.setPinned(false);
         return service.createCompilation(dto);
     }
 
     @PatchMapping("/{compId}")
-    @ResponseStatus(HttpStatus.OK)
     public CompilationDto updateCompilation(
             @PositiveOrZero @PathVariable Long compId,
-            @Valid @RequestBody CreateCompilationDto dto) {
-        if(dto.getPinned() == null)
-            dto.setPinned(false);
-        return service.updateCompilation(CompilationMapper.toUpdateCompilationDto(compId, dto));
+            @Valid @RequestBody UpdateCompilationDto dto) {  // ← ИСПРАВЛЕНО: используем UpdateCompilationDto
+        log.info("PATCH /admin/compilations/{} - обновление подборки: events={}, pinned={}, title={}",
+                compId, dto.getEvents(), dto.getPinned(), dto.getTitle());
+
+        // Собираем DTO для сервиса
+        UpdateCompilationDto serviceDto = UpdateCompilationDto.builder()
+                .id(compId)
+                .events(dto.getEvents())
+                .pinned(dto.getPinned())
+                .title(dto.getTitle())
+                .build();
+
+        return service.updateCompilation(serviceDto);
     }
 
     @DeleteMapping("/{compId}")

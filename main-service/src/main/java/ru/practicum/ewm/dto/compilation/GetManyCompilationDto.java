@@ -7,6 +7,6 @@ import lombok.Value;
 @Builder
 public class GetManyCompilationDto {
     Boolean pinned;
-    Long from;
-    Long size;
+    Integer from;
+    Integer size;
 }

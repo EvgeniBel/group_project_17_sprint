@@ -23,4 +23,6 @@ public interface StatClient {
      * @return Содержит список данных статистики.
      */
     List<StatResponseDto> getStats(StatRequestParamDto dto);
+
+    void saveHit(String uri, String app);
 }

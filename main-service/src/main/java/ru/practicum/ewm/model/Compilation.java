@@ -1,10 +1,7 @@
 package ru.practicum.ewm.model;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import ru.practicum.ewm.model.event.Event;
 
 import java.util.List;
@@ -12,6 +9,7 @@ import java.util.List;
 @Entity
 @Builder
 @Getter
+@Setter
 @Table(name = "compilation")
 @AllArgsConstructor
 @NoArgsConstructor
@@ -22,7 +20,12 @@ public class Compilation {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToMany(mappedBy = "compilations", fetch = FetchType.LAZY)
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "event_compilation",
+            joinColumns = @JoinColumn(name = "compilation_id"),
+            inverseJoinColumns = @JoinColumn(name = "event_id")
+    )
     private List<Event> events;
 
     @Column(name = "pinned")

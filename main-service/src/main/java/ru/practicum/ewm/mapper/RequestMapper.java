@@ -8,10 +8,11 @@ import ru.practicum.ewm.model.request.ParticipationRequest;
 import ru.practicum.ewm.model.request.RequestStatus;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 @UtilityClass
 public class RequestMapper {
-
+    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 //    Преобразование в сущность
 
     public ParticipationRequest toEntity(LocalDateTime nowData, Event event, User requester, RequestStatus status) {
@@ -28,7 +29,7 @@ public class RequestMapper {
     public ParticipationRequestDto toParticipationRequestDto(ParticipationRequest req) {
         return ParticipationRequestDto.builder()
                 .id(req.getId())
-                .created(req.getCreated().toString())
+                .created(req.getCreated().format(FORMATTER))
                 .event(req.getEvent().getId())
                 .requester(req.getRequester().getId())
                 .status(req.getStatus().toString())

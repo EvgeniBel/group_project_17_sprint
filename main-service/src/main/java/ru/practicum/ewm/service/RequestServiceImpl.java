@@ -1,7 +1,7 @@
 package ru.practicum.ewm.service;
 
 import lombok.RequiredArgsConstructor;
-import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.ewm.dto.request.CreateUpdateRequestDto;
@@ -22,7 +22,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
-@Log4j2
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class RequestServiceImpl implements RequestService {
@@ -34,31 +34,33 @@ public class RequestServiceImpl implements RequestService {
     @Transactional
     @Override
     public ParticipationRequestDto createRequest(CreateUpdateRequestDto dto) {
-//        Дата создания
-        LocalDateTime nowDate = LocalDateTime.now();
-//        Получение сущностей для создания связей через JPA
+        log.info("Создание запроса на участие: userId={}, eventId={}", dto.getUserId(), dto.getEventId());
+
+        LocalDateTime now = LocalDateTime.now();
         Event event = findEvent(dto.getEventId());
         User requester = findUser(dto.getUserId());
 
-        //Проверка, что событие опубликовано
+        // Проверка, что событие опубликовано
         if (event.getState() != EventState.PUBLISHED) {
             log.error("Не удается создать запрос на неопубликованное событие с id={}", event.getId());
             throw new ConflictException("Событие еще не опубликовано");
         }
-        //Проверка, что инициатор не пытается участвовать в своем событии
+
+        // Проверка, что инициатор не пытается участвовать в своем событии
         if (event.getInitiator().getId().equals(requester.getId())) {
-            log.error("Инициатор не может участвовать в собственном мероприятии. eventId={}, userId={}", event.getId(), requester.getId());
+            log.error("Инициатор не может участвовать в собственном мероприятии. eventId={}, userId={}",
+                    event.getId(), requester.getId());
             throw new ConflictException("Инициатор не может участвовать в собственном мероприятии");
         }
 
-        //Проверка, что пользователь уже не создавал запрос
+        // Проверка, что пользователь уже не создавал запрос
         Optional<ParticipationRequest> existingRequest =
                 requestRepository.findByRequester_IdAndEvent_Id(requester.getId(), event.getId());
 
         if (existingRequest.isPresent()) {
-            log.error("Запрос пользователя {} на событие {} уже существует",
-                    requester.getId(), event.getId());
-            throw new ConflictException(String.format("Запрос пользователя c id=%d на событие c id=%d уже существует", requester.getId(), event.getId()));
+            log.error("Запрос пользователя {} на событие {} уже существует", requester.getId(), event.getId());
+            throw new ConflictException(String.format("Запрос пользователя c id=%d на событие c id=%d уже существует",
+                    requester.getId(), event.getId()));
         }
 
         // Проверка лимита участников
@@ -68,38 +70,36 @@ public class RequestServiceImpl implements RequestService {
         if (event.getParticipantLimit() > 0 && approvedRequestsCount >= event.getParticipantLimit()) {
             log.error("Достигнут лимит участников для event {}. Limit: {}, CONFIRMED: {}",
                     event.getId(), event.getParticipantLimit(), approvedRequestsCount);
-            throw new ConflictException(String.format("Достигнут лимит участников. Limit=%d, Approved=%d", event.getParticipantLimit(), approvedRequestsCount));
+            throw new ConflictException(String.format("Достигнут лимит участников. Limit=%d", event.getParticipantLimit()));
         }
-        //Определение статуса запроса
+
+        // ИСПРАВЛЕНО: определение статуса запроса согласно спецификации
         RequestStatus initialStatus;
 
         if (event.getParticipantLimit() == 0) {
+            // Нет лимита - автоматическое подтверждение
             initialStatus = RequestStatus.CONFIRMED;
         } else if (!event.getRequestModeration()) {
+            // Пре-модерация отключена - автоматическое подтверждение
             initialStatus = RequestStatus.CONFIRMED;
         } else {
+            // Пре-модерация включена - ожидание
             initialStatus = RequestStatus.PENDING;
         }
 
+        ParticipationRequest request = RequestMapper.toEntity(now, event, requester, initialStatus);
+        ParticipationRequest saved = requestRepository.save(request);
 
-//        Получение готовой сущности
-        ParticipationRequest req = RequestMapper.toEntity(
-                nowDate,
-                event,
-                requester,
-                initialStatus
-        );
-
-        log.info("Создание запроса для userId={} с eventId={} со statusId={}",
-                requester.getId(), event.getId(), initialStatus);
-//        Сохранение
-        return RequestMapper.toParticipationRequestDto(
-                requestRepository.save(req)
-        );
+        log.info("Создан запрос с id={}, статус={}", saved.getId(), initialStatus);
+        return RequestMapper.toParticipationRequestDto(saved);
     }
 
     @Override
     public List<ParticipationRequestDto> getRequestByUserId(Long userId) {
+        log.info("Получение запросов пользователя с id={}", userId);
+
+        findUser(userId); // проверка существования
+
         return requestRepository.findAllByUserId(userId)
                 .stream()
                 .map(RequestMapper::toParticipationRequestDto)
@@ -109,36 +109,43 @@ public class RequestServiceImpl implements RequestService {
     @Transactional
     @Override
     public ParticipationRequestDto canceledRequest(Long userId, Long requestId) {
-//        Проверка на существование сущностей
-        User requester = findUser(userId);
+        log.info("Отмена запроса: userId={}, requestId={}", userId, requestId);
 
-//        Меняем статус
-        if (requestRepository.changeState(requestId, RequestStatus.CANCELED) > 0)
-            log.info("Статус запроса с id:{}, успешно изменён на {}}", requestId, RequestStatus.CANCELED);
+        findUser(userId); // проверка существования
 
-        return RequestMapper.toParticipationRequestDto(
-                findParticipationRequest(requestId)
-        );
+        ParticipationRequest request = findParticipationRequest(requestId);
+
+        // Проверка, что запрос принадлежит пользователю
+        if (!request.getRequester().getId().equals(userId)) {
+            log.error("Запрос с id={} не принадлежит пользователю с id={}", requestId, userId);
+            throw new NotFoundException("Запрос не найден или не принадлежит пользователю");
+        }
+
+        // Только PENDING запросы можно отменить
+        if (request.getStatus() != RequestStatus.PENDING) {
+            log.error("Нельзя отменить запрос со статусом: {}", request.getStatus());
+            throw new ConflictException("Можно отменить только запросы в статусе PENDING");
+        }
+
+        request.setStatus(RequestStatus.CANCELED);
+        ParticipationRequest canceled = requestRepository.save(request);
+
+        log.info("Запрос с id={} отменен", requestId);
+        return RequestMapper.toParticipationRequestDto(canceled);
     }
 
-    //    Получение пользователя
     private User findUser(Long userId) {
-        return userRepository.findById(userId).orElseThrow(
-                () -> new NotFoundException("User with id " + userId + " not found")
-        );
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("User with id " + userId + " not found"));
     }
 
-    //    Получение события
     private Event findEvent(Long eventId) {
-        return eventRepository.findById(eventId).orElseThrow(
-                () -> new NotFoundException("Event with id " + eventId + " not found")
-        );
+        return eventRepository.findById(eventId)
+                .orElseThrow(() -> new NotFoundException("Event with id " + eventId + " not found"));
     }
 
-    //    Получение запроса
     private ParticipationRequest findParticipationRequest(Long requestId) {
-        return requestRepository.findById(requestId).orElseThrow(
-                () -> new NotFoundException("Request with id " + requestId + " not found")
-        );
+        return requestRepository.findById(requestId)
+                .orElseThrow(() -> new NotFoundException("Request with id " + requestId + " not found"));
     }
 }

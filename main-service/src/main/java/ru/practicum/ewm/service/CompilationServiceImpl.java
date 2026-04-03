@@ -1,9 +1,9 @@
 package ru.practicum.ewm.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.ewm.dto.compilation.CompilationDto;
@@ -23,124 +23,154 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CompilationServiceImpl implements CompilationService {
 
-    private final CompilationRepository compRep;
-    private final EventRepository eventRep;
+    private final CompilationRepository compilationRepository;
+    private final EventRepository eventRepository;
     private final EventService eventService;
 
     @Transactional
     @Override
     public CompilationDto createCompilation(CreateCompilationDto dto) {
-        List<Event> events;
-        if (dto.getEvents() == null) {
-            events = new ArrayList<>();
-            dto.setEvents(new ArrayList<>());
-        } else
-            events = eventRep.findAllById(dto.getEvents());
-        return CompilationMapper.toCompilationDto(
-                compRep.save(CompilationMapper.toEntity(dto, events)),
-                eventService.getShortEventsInfoByIds(dto.getEvents())
-        );
+        log.info("Создание подборки: title={}, events={}, pinned={}",
+                dto.getTitle(), dto.getEvents(), dto.getPinned());
+
+        try {
+            List<Event> events = new ArrayList<>();
+            List<Long> eventIds = dto.getEvents();
+
+            if (eventIds != null && !eventIds.isEmpty()) {
+                events = eventRepository.findAllById(eventIds);
+                log.debug("Найдено событий: {} из {}", events.size(), eventIds.size());
+            }
+
+            Compilation compilation = CompilationMapper.toEntity(dto, events);
+            Compilation saved = compilationRepository.save(compilation);
+            log.info("Подборка создана с id: {}", saved.getId());
+
+            return CompilationMapper.toCompilationDto(saved,
+                    eventService.getShortEventsInfoByIds(eventIds != null ? eventIds : List.of()));
+        } catch (Exception e) {
+            log.error("Ошибка при создании подборки: {}", e.getMessage(), e);
+            throw e;
+        }
     }
 
     @Transactional
     @Override
     public CompilationDto updateCompilation(UpdateCompilationDto dto) {
-        Compilation old = compRep.findById(dto.getId()).orElseThrow(
-                () -> new NotFoundException("Compilation not found")
-        );
-        if (dto.getEvents() != null) {
-            List<Event> events = eventRep.findAllById(dto.getEvents());
-            if (events.size() != dto.getEvents().size())
-                throw new NotFoundException("Часть переданных событий не существует");
-            old = update(old, dto, events);
+        log.info("Обновление подборки с id: {}", dto.getId());
+        log.info("Получены события для добавления: {}", dto.getEvents());
+
+        Compilation compilation = compilationRepository.findById(dto.getId())
+                .orElseThrow(() -> new NotFoundException("Подборка с id=" + dto.getId() + " не найдена"));
+
+        if (dto.getTitle() != null) {
+            compilation.setTitle(dto.getTitle());
         }
-        return CompilationMapper.toCompilationDto(
-                compRep.save(old),
-                eventService.getShortEventsInfoByIds(dto.getEvents())
-        );
+
+        if (dto.getPinned() != null) {
+            compilation.setPinned(dto.getPinned());
+        }
+
+        if (dto.getEvents() != null && !dto.getEvents().isEmpty()) {
+            log.info("Поиск событий по ID: {}", dto.getEvents());
+            List<Event> events = eventRepository.findAllById(dto.getEvents());
+            log.info("Найдено событий: {} из {}", events.size(), dto.getEvents().size());
+
+            if (events.size() != dto.getEvents().size()) {
+                log.error("События не найдены: {}", dto.getEvents());
+                throw new NotFoundException("Некоторые события не найдены");
+            }
+
+            // Очищаем старые связи и добавляем новые
+            compilation.getEvents().clear();
+            compilation.getEvents().addAll(events);
+            log.info("События добавлены в подборку");
+        }
+
+        Compilation updated = compilationRepository.save(compilation);
+        log.info("Подборка сохранена, количество событий: {}", updated.getEvents().size());
+
+        List<Long> eventIds = updated.getEvents().stream()
+                .map(Event::getId)
+                .collect(Collectors.toList());
+
+        return CompilationMapper.toCompilationDto(updated,
+                eventService.getShortEventsInfoByIds(eventIds));
     }
 
     @Transactional
     @Override
     public void removeCompilation(Long compId) {
-        if (!compRep.existsById(compId))
-            throw new NotFoundException("Compilation not found");
-        compRep.deleteById(compId);
+        log.info("Удаление подборки с id: {}", compId);
+
+        if (!compilationRepository.existsById(compId)) {
+            throw new NotFoundException("Подборка с id=" + compId + " не найдена");
+        }
+        compilationRepository.deleteById(compId);
     }
 
     @Override
     public List<CompilationDto> getCompilations(GetManyCompilationDto dto) {
-        Pageable pageable = PageRequest.of(
-                0,
-                dto.getSize().intValue(),
-                Sort.by(Sort.Direction.ASC, "id")
-        );
+        log.info("Получение подборок: pinned={}, from={}, size={}",
+                dto.getPinned(), dto.getFrom(), dto.getSize());
 
-//      Получение подборок
-        List<Compilation> compilations = compRep.findAllByPinnedFilter(dto.getPinned(), dto.getFrom(), pageable);
+        // ИСПРАВЛЕНО: правильная пагинация
+        int page = dto.getFrom() / dto.getSize();
+        Pageable pageable = PageRequest.of(page, dto.getSize());
 
-//      Список всех уникальных EventShortDto во всех подборках
-        Map<Long, EventShortDto> eventsMap =
-//              Получение уникальных событий(EventShortDto) среди всех подборок
-                eventService.getShortEventsInfoByIds(
-//                              Получение уникальных id событий среди всех подборок
-                                compilations.stream()
-                                        .flatMap(c -> c.getEvents().stream())
-                                        .map(Event::getId)
-                                        .distinct()
-                                        .toList()
-                        ).stream()
-//                      Создание Map для распределения EventShortDto по подборкам
-                        .collect(Collectors.toMap(
-                                        EventShortDto::getId,
-                                        shortDto -> shortDto
-                                )
-                        );
+        List<Compilation> compilations;
+        if (dto.getPinned() != null) {
+            compilations = compilationRepository.findAllByPinned(dto.getPinned(), pageable)
+                    .getContent();
+        } else {
+            compilations = compilationRepository.findAll(pageable).getContent();
+        }
 
+        if (compilations.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        // Собираем все ID событий из всех подборок
+        List<Long> allEventIds = compilations.stream()
+                .flatMap(c -> c.getEvents().stream())
+                .map(Event::getId)
+                .distinct()
+                .collect(Collectors.toList());
+
+        // Получаем все события одной пачкой
+        List<EventShortDto> allEvents = eventService.getShortEventsInfoByIds(allEventIds);
+        Map<Long, EventShortDto> eventMap = allEvents.stream()
+                .collect(Collectors.toMap(EventShortDto::getId, e -> e));
+
+        // Формируем результат
         return compilations.stream()
-//              Маппинг
                 .map(comp -> CompilationMapper.toCompilationDto(
                         comp,
-//                      Получение List<EventShortDto> по List<Event> с помощью заранее подготовленной eventsMap
                         comp.getEvents().stream()
-                                .map(e -> eventsMap.get(e.getId()))
-                                .toList()
+                                .map(e -> eventMap.get(e.getId()))
+                                .filter(e -> e != null)
+                                .collect(Collectors.toList())
                 ))
-                .toList();
+                .collect(Collectors.toList());
     }
 
     @Override
     public CompilationDto getCompilationById(Long compId) {
-        Compilation comp = compRep.findById(compId).orElseThrow(
-                () -> new NotFoundException("Compilation not found")
-        );
-        return CompilationMapper.toCompilationDto(
-                comp,
-                eventService.getShortEventsInfoByIds(
-                        comp.getEvents().stream()
-                                .map(Event::getId)
-                                .toList()
-                )
-        );
-    }
+        log.info("Получение подборки по id: {}", compId);
 
-    private Compilation update(Compilation old, UpdateCompilationDto newDto, List<Event> events) {
-        return Compilation.builder()
-                .id(old.getId())
-                .events(events != null
-                        ? events
-                        : old.getEvents())
-                .title(newDto.getTitle() != null
-                        ? newDto.getTitle()
-                        : old.getTitle())
-                .pinned(newDto.getPinned() != null
-                        ? newDto.getPinned()
-                        : old.getPinned())
-                .build();
-    }
+        Compilation compilation = compilationRepository.findById(compId)
+                .orElseThrow(() -> new NotFoundException("Подборка с id=" + compId + " не найдена"));
 
+        List<Long> eventIds = compilation.getEvents().stream()
+                .map(Event::getId)
+                .collect(Collectors.toList());
+
+        return CompilationMapper.toCompilationDto(compilation,
+                eventService.getShortEventsInfoByIds(eventIds));
+    }
 }

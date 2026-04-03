@@ -2,7 +2,6 @@ package ru.practicum.ewm.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -14,6 +13,7 @@ import ru.practicum.ewm.exception.NotFoundException;
 import ru.practicum.ewm.mapper.CategoryMapper;
 import ru.practicum.ewm.model.Category;
 import ru.practicum.ewm.repository.CategoryRepository;
+import ru.practicum.ewm.repository.EventRepository;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -24,6 +24,7 @@ import java.util.stream.Collectors;
 public class CategoryServiceImpl implements CategoryService {
 
     private final CategoryRepository categoryRepository;
+    private final EventRepository eventRepository;  // ДОБАВЛЕНО для проверки связанных событий
 
     @Override
     @Transactional
@@ -67,7 +68,9 @@ public class CategoryServiceImpl implements CategoryService {
         Category category = categoryRepository.findById(catId)
                 .orElseThrow(() -> new NotFoundException("Категория с id=" + catId + " не найдена"));
 
-        if (category.getEvents() != null && !category.getEvents().isEmpty()) {
+        // ИСПРАВЛЕНО: используем отдельный запрос для проверки связанных событий
+        boolean hasEvents = eventRepository.existsByCategoryId(catId);
+        if (hasEvents) {
             throw new ConflictException("Невозможно удалить категорию, так как с ней связаны события");
         }
 
@@ -79,21 +82,11 @@ public class CategoryServiceImpl implements CategoryService {
     public List<CategoryDto> getCategories(Integer from, Integer size) {
         log.info("Получение категорий: from = {}, size = {}", from, size);
 
-        if (size == null || size <= 0) {
-            return List.of();
-        }
-        if (from == null || from < 0) {
-            from = 0;
-        }
-
         int page = from / size;
         Pageable pageable = PageRequest.of(page, size);
 
-        Page<Category> pageResult = categoryRepository.findAll(pageable);
-        List<Category> categories = pageResult.getContent();
-
-        log.info("Найдено категорий: {}", categories.size());
-        return categories.stream()
+        return categoryRepository.findAll(pageable)
+                .stream()
                 .map(CategoryMapper::toCategoryDto)
                 .collect(Collectors.toList());
     }
