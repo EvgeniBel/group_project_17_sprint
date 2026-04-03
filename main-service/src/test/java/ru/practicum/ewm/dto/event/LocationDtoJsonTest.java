@@ -14,7 +14,7 @@ import static org.assertj.core.api.AssertionsForInterfaceTypes.assertThat;
 class LocationDtoJsonTest {
     private final JacksonTester<LocationDto> json;
 
-    LocationDto location = new LocationDto(33.56,76.87);
+    LocationDto location = new LocationDto(33.56, 76.87);
 
     @Test
     void testLocationDto() throws Exception {

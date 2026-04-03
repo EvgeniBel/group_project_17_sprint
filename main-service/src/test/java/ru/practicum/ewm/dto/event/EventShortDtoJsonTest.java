@@ -43,7 +43,7 @@ class EventShortDtoJsonTest {
         assertThat(result).extractingJsonPathStringValue("$.category.name").isEqualTo("Цирк");
         assertThat(result).extractingJsonPathNumberValue("$.confirmedRequests").isEqualTo(10654);
         assertThat(result).extractingJsonPathStringValue("$.eventDate")
-                .isEqualTo(LocalDateTime.of(2026, 11, 12, 10, 0,0).format(Constants.FORMATTER));
+                .isEqualTo(LocalDateTime.of(2026, 11, 12, 10, 0, 0).format(Constants.FORMATTER));
         assertThat(result).extractingJsonPathNumberValue("$.id").isEqualTo(7);
         assertThat(result).extractingJsonPathNumberValue("$.initiator.id").isEqualTo(1);
         assertThat(result).extractingJsonPathStringValue("$.initiator.name").isEqualTo("Коля");

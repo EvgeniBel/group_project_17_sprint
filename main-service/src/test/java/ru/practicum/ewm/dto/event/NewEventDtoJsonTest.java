@@ -17,7 +17,7 @@ import static org.assertj.core.api.AssertionsForInterfaceTypes.assertThat;
 class NewEventDtoJsonTest {
     private final JacksonTester<NewEventDto> json;
 
-    LocationDto location = new LocationDto(33.56,76.87);
+    LocationDto location = new LocationDto(33.56, 76.87);
 
     NewEventDto dto = NewEventDto.builder()
             .annotation("новое очень интересное событие")
@@ -40,7 +40,7 @@ class NewEventDtoJsonTest {
         assertThat(result).extractingJsonPathStringValue("$.description")
                 .isEqualTo("супер новое очень интересное событие");
         assertThat(result).extractingJsonPathStringValue("$.eventDate")
-                .isEqualTo(LocalDateTime.of(2026, 10, 23, 15, 30,0).format(Constants.FORMATTER));
+                .isEqualTo(LocalDateTime.of(2026, 10, 23, 15, 30, 0).format(Constants.FORMATTER));
         assertThat(result).extractingJsonPathNumberValue("$.location.lat").isEqualTo(33.56);
         assertThat(result).extractingJsonPathNumberValue("$.location.lon").isEqualTo(76.87);
         assertThat(result).extractingJsonPathBooleanValue("$.paid").isEqualTo(true);

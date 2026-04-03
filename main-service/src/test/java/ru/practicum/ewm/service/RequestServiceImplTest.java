@@ -10,10 +10,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import ru.practicum.ewm.dto.request.CreateUpdateRequestDto;
 import ru.practicum.ewm.dto.request.ParticipationRequestDto;
 import ru.practicum.ewm.exception.NotFoundException;
-import ru.practicum.ewm.model.event.EventState;
-import ru.practicum.ewm.model.request.ParticipationRequest;
 import ru.practicum.ewm.model.User;
 import ru.practicum.ewm.model.event.Event;
+import ru.practicum.ewm.model.event.EventState;
+import ru.practicum.ewm.model.request.ParticipationRequest;
 import ru.practicum.ewm.model.request.RequestStatus;
 import ru.practicum.ewm.repository.EventRepository;
 import ru.practicum.ewm.repository.RequestRepository;
@@ -154,5 +154,5 @@ class RequestServiceImplTest {
         verify(userRepository).findById(1L);
         verify(eventRepository, never()).findById(any());
     }
-    
+
 }
