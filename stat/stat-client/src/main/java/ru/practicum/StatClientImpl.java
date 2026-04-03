@@ -76,6 +76,7 @@ public class StatClientImpl implements StatClient {
             return new ArrayList<>();
         }
     }
+
     public void saveHit(String uri, String app) {
         HitDto hitDto = new HitDto();
         hitDto.setApp(app);
@@ -86,5 +87,4 @@ public class StatClientImpl implements StatClient {
         log.debug("Сохранение статистики: uri={}, app={}", uri, app);
         postHit(hitDto);  // переиспользуем существующий метод
     }
-
 }
